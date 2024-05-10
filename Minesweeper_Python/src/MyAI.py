@@ -19,10 +19,16 @@ from Action import Action
 class MyAI( AI ):
 
 	def __init__(self, rowDimension, colDimension, totalMines, startX, startY):
+		self.totalMines = totalMines
+		self.coveredTilesLeft = rowDimension*colDimension - 1
 
 		########################################################################
 		#							YOUR CODE BEGINS						   #
 		########################################################################
+		
+		# queue of moves based on game board
+		#
+
 		pass
 		########################################################################
 		#							YOUR CODE ENDS							   #
@@ -33,8 +39,12 @@ class MyAI( AI ):
 
 		########################################################################
 		#							YOUR CODE BEGINS						   #
+		# execute the next move in the move queue
+		# print('debug')
+		# return Action(AI.Action.UNCOVER, 0, 0)
 		########################################################################
-		return Action(AI.Action.LEAVE)
+		if self.coveredTilesLeft <= self.totalMines:
+			return Action(AI.Action.LEAVE)
 		########################################################################
 		#							YOUR CODE ENDS							   #
 		########################################################################
