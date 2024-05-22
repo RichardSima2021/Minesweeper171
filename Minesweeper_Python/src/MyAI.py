@@ -121,7 +121,7 @@ class MyAI( AI ):
 		self.frontierQueue = recheckFrontier
 
 		if not solvedWithRuleOfThumb:
-			if len(list(self.moveQueue.queue)) > 2:
+			if len(list(self.moveQueue.queue)) > 1:
 				# keep performing moves in the move queue
 				return
 			# choose the least risky move
@@ -130,6 +130,11 @@ class MyAI( AI ):
 	
 	def chooseLeastRiskyMove(self):
 		print('Use probability')
+		# right now frontier contains the edgemost uncovered tiles, we need to use these to estimate
+
+		# set frontier tiles to their effective labels
+
+		# test mine arrangements
 	
 			
 			
