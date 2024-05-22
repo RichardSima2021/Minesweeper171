@@ -36,6 +36,7 @@ class MyAI( AI ):
 		#
 		self.frontierQueue = Queue()
 		self.moveQueue = Queue()
+		self.secondFrontier = Queue()
         
 		self.enqueuedCoords = set()
 		pass
@@ -94,9 +95,12 @@ class MyAI( AI ):
 		for coord in temp_queue:
 			self.frontierQueue.put(coord)
 			
-	def applyRulesOfThumb(self):
+	def solve(self):
 		# print(list(self.frontierQueue.queue))
 		recheckFrontier = Queue()
+		
+		solvedWithRuleOfThumb = False
+
 		# if rule of thumb can't be applied now, check it again later        
 		while not self.frontierQueue.empty():
 			x, y = self.frontierQueue.get()
@@ -105,14 +109,31 @@ class MyAI( AI ):
 			if effective_label == num_unmarked_neighbors:
 				# All unmarked neighbors are mines
 				self.markAllNeighborsAsMines(x, y)
+				solvedWithRuleOfThumb = True
 			elif effective_label == 0:               
 				self.enqueueSafeMoves(x, y)
+				solvedWithRuleOfThumb = True
 			else:
 				if effective_label > 0:
 					# if the tile has been uncovered before
 					# print(f'{x+1},{y+1} could not have rule of thumb applied, re check later')                
 					recheckFrontier.put((x,y))
 		self.frontierQueue = recheckFrontier
+
+		if not solvedWithRuleOfThumb:
+			if len(list(self.moveQueue.queue)) > 2:
+				# keep performing moves in the move queue
+				return
+			# choose the least risky move
+			self.chooseLeastRiskyMove()
+			
+	
+	def chooseLeastRiskyMove(self):
+		print('Use probability')
+	
+			
+			
+
 
 	def markAllNeighborsAsMines(self, x, y):
 		for dx in [-1, 0, 1]:
@@ -156,7 +177,12 @@ class MyAI( AI ):
 				self.gameBoard[self.lastActionCoord[0]][self.lastActionCoord[1]] = -1
 		self.frontierQueue.put((self.lastActionCoord[0], self.lastActionCoord[1]))
 		self.enqueueAllUnexploredNeighbors(self.lastActionCoord[0], self.lastActionCoord[1])
-		self.applyRulesOfThumb()
+		print(f'Frontier: {list(self.frontierQueue.queue)}')
+		self.solve()
+		print(f'After going through frontier and ruling out all moves solvable with rule of thumb: {list(self.frontierQueue.queue)}')
+		print(f'Safe moves:')
+		for move in self.moveQueue.queue:
+			print(move)
 		
 		while not self.moveQueue.empty():
 			nx, ny, action = self.moveQueue.get()
