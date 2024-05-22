@@ -109,6 +109,9 @@ def main():
 
 					world = World(filename=f, aiType=aiType, verbose=verbose, debug=debug)
 
+					print(f'Playing World {f}') # debug use
+
+
 					score = world.run()
 					if score == 1:
 						scoreBeg += 1
@@ -116,6 +119,7 @@ def main():
 						scoreInt += 1
 					elif score == 3:
 						scoreExp += 1
+
 
 					numScores += 1
 					sumScores += score

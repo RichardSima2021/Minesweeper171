@@ -1,0 +1,25 @@
+def recursivelyGenerateMineConfig(possibleMineSpace, currentConfig, allConfigs, index):
+    if index == len(possibleMineLocations):
+        allConfigs.append(currentConfig.copy())
+        return
+
+    
+    # recursive case
+    currentConfig.append(possibleMineLocations[index])
+    if isValid(currentConfig):
+        recursivelyGenerateMineConfig(possibleMineSpace, currentConfig, allConfigs, index + 1)
+        currentConfig.pop()
+
+    recursivelyGenerateMineConfig(possibleMineSpace, currentConfig, allConfigs, index + 1)
+
+
+
+
+
+def generateMineConfigs(self, possibleMineSpace, effectiveFrontier, neighboursOfTile):
+    allConfigs = []
+    currentConfig = []
+
+    recursivelyGenerateMineConfig(possibleMineSpace, currentConfig, allConfigs, 0)
+
+    return allConfigs
