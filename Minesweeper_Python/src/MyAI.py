@@ -37,14 +37,12 @@ class MyAI( AI ):
 		self.lastActionCoord = None
 		self.lastActionCoord = self.startX, self.startY
 		# queue of moves based on game board
-		#
-		self.frontierQueue = Queue()
 
 		self.enqueuedInFrontier = set()
 		self.visitedTiles = set()
 
-		self.uncoveredSet = set()
-		self.frontierSet = {(startX,startY)}
+		self.uncoveredFrontier = set()
+		self.coveredFrontier = {(startX,startY)}
 		self.moveSet = set()
 
 		self.debugPrints = False
@@ -119,13 +117,11 @@ class MyAI( AI ):
 							temp_queue.append(coord)
 		# Enqueue all unique and valid neighbors found
 		for coord in temp_queue:
-			# self.frontierQueue.put(coord)
-			self.frontierSet.add(coord)
+			self.coveredFrontier.add(coord)
 			# prevents duplicates
 			self.enqueuedInFrontier.add(coord)
 			
 	def solve(self):
-		# print(list(self.frontierQueue.queue))
 		recheckSet = set()
 		
 		solvedWithRuleOfThumb = False
@@ -137,12 +133,12 @@ class MyAI( AI ):
 					if self.gameBoard[row][col] is None:
 						# prevent duplicates                        
 						self.moveSet.add((row, col, AI.Action.UNCOVER))
-						# prevent frontierSet key not found bug
-						self.frontierSet.add((row,col))
+						# prevent coveredFrontier key not found bug
+						self.coveredFrontier.add((row,col))
 
 		# if rule of thumb can't be applied now, check it again later        
-		while len(self.uncoveredSet):
-			x, y = self.uncoveredSet.pop()
+		while len(self.uncoveredFrontier):
+			x, y = self.uncoveredFrontier.pop()
 			# print(f'Try to apply rule of thumb to {x,y}')
 			effective_label = self.effectiveLabel(x, y)
 			num_unmarked_neighbors = self.numUnMarkedNeighbors(x, y)
@@ -160,7 +156,7 @@ class MyAI( AI ):
 					# if the tile has been uncovered before
 					# print(f'{x,y} could not have rule of thumb applied, re check later')                
 					recheckSet.add((x,y))
-		self.uncoveredSet = recheckSet
+		self.uncoveredFrontier = recheckSet
 
 		if not solvedWithRuleOfThumb:
 			# need to invoke this 
@@ -169,10 +165,57 @@ class MyAI( AI ):
 
 			# if theres no more moves to make
 			# choose the least risky move
-			self.chooseLeastRiskyMove()
-			# self.chooseLeastRiskyTileset()
+			# self.chooseLeastRiskyMove()
+			self.chooseLeastRiskyTileset()
 
 	def chooseLeastRiskyTileset(self):
+		
+		
+		# generate effective edge tiles
+		effectiveEdgeTiles = dict()
+		for tile in self.uncoveredFrontier:
+			x, y = tile
+			effectiveEdgeTiles[(x,y)] = self.effectiveLabel(x,y)
+		
+		print('Possible Mine Spaces: ', sorted(self.coveredFrontier))
+		print('Effective edge tiles', sorted(effectiveEdgeTiles.items()))
+		tileSets = dict()
+		maxMinesPerTileSet = dict()
+		# go through covered frontier
+		for tile in self.coveredFrontier:
+		# for each tile, find its uncovered neighbors
+			x,y = tile
+			neighbours = tuple(self.getUncoveredNeighbours(x,y))
+			# print(f'{(x,y)}s uncovered neighbors: {neighbours}')
+			if len(neighbours) > 0:
+				if neighbours not in tileSets.keys():
+					# if this is actually a covered tile adjacent to an uncovered tile
+					tileSets[neighbours] = []
+				tileSets[neighbours].append((x,y))
+		
+		for tileSet in tileSets.keys():
+			# find largest number of mines this tileset can have
+
+			# this is whichever is smaller between number of tiles in the tileset, and the lowest labelled tile its adjacent to
+
+			maxMines = 0
+			numTiles = len(tileSet)
+			lowestLabel = effectiveEdgeTiles[tileSet[0]]
+			for neighbor in tileSet:
+				if effectiveEdgeTiles[neighbor] < lowestLabel:
+					lowestLabel = effectiveEdgeTiles[neighbor]
+			maxMines = min(numTiles, lowestLabel)
+			maxMinesPerTileSet[tileSet] = maxMines
+		
+		for tileSet in sorted(tileSets.items()):
+			print(tileSet)
+		print('-------------------')
+		for tileSetMaxMines in sorted(maxMinesPerTileSet.items()):			
+			print(tileSetMaxMines)
+
+		# each unique set of uncovered neighbors is a tileSet
+
+		
 		pass
 
 			
@@ -188,7 +231,7 @@ class MyAI( AI ):
 
 		# set frontier tiles to their effective labels
 		effectiveEdgeTiles = dict()
-		for tile in self.uncoveredSet:
+		for tile in self.uncoveredFrontier:
 			x, y = tile
 			effectiveEdgeTiles[(x,y)] = self.effectiveLabel(x,y)
 		
@@ -262,7 +305,7 @@ class MyAI( AI ):
 
 		# print(f'Uncovering least risky tile: {least_risky_tile}')
 
-		self.frontierSet.add((x,y))
+		self.coveredFrontier.add((x,y))
 		# prevent duplicates                        
 		self.moveSet.add((x, y, AI.Action.UNCOVER))
 
@@ -439,18 +482,17 @@ class MyAI( AI ):
 			else:
 				self.gameBoard[self.lastActionCoord[0]][self.lastActionCoord[1]] = -1
 
-		self.uncoveredSet.add((self.lastActionCoord[0], self.lastActionCoord[1]))
-		self.frontierSet.remove((self.lastActionCoord[0], self.lastActionCoord[1]))
-		# self.frontierQueue.put((self.lastActionCoord[0], self.lastActionCoord[1]))
+		self.uncoveredFrontier.add((self.lastActionCoord[0], self.lastActionCoord[1]))
+		self.coveredFrontier.remove((self.lastActionCoord[0], self.lastActionCoord[1]))
 		self.visitedTiles.add((self.lastActionCoord[0], self.lastActionCoord[1]))
 		self.enqueueAllUnexploredNeighbors(self.lastActionCoord[0], self.lastActionCoord[1])
 
-		# print(f'Uncovered Frontier: {sorted(list(self.uncoveredSet))}')
-		# print(f'Covered Frontier: {sorted(list(self.frontierSet))}')
+		# print(f'Uncovered Frontier: {sorted(list(self.uncoveredFrontier))}')
+		# print(f'Covered Frontier: {sorted(list(self.coveredFrontier))}')
 
 		self.solve()
 
-		# print(f'After going through uncovered and ruling out all moves solvable with rule of thumb: {list(self.uncoveredSet)}')
+		# print(f'After going through uncovered and ruling out all moves solvable with rule of thumb: {list(self.uncoveredFrontier)}')
 		# print(f'Safe moves:')
 		# for move in self.moveSet:
 		# 	print(move)
