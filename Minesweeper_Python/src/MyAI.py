@@ -16,6 +16,7 @@ from AI import AI
 from Action import Action
 from queue import Queue
 import math
+import concurrent.futures
 
 class MyAI( AI ):
 
@@ -65,6 +66,8 @@ class MyAI( AI ):
 				else:
 					rowStr += f'{tile} '
 			print(rowStr)
+		
+		print('---------------------------------------')
 
 
 
@@ -148,13 +151,13 @@ class MyAI( AI ):
 			num_unmarked_neighbors = self.numUnMarkedNeighbors(x, y)
 			if effective_label == num_unmarked_neighbors:
 				# All unmarked neighbors are mines
-				self.markAllNeighborsAsMines(x, y)
+				numMarkedNeighbors = self.markAllNeighborsAsMines(x, y)
 				# print(f'All neighbors rule applied to {x,y}')
-				solvedWithRuleOfThumb = True
+				solvedWithRuleOfThumb = (numMarkedNeighbors > 0)
 			elif effective_label == 0:               
-				self.enqueueSafeMoves(x, y)
+				numEnqueuedSafe = self.enqueueSafeMoves(x, y)
 				# print(f'Effective Label 0 rule applied to {x,y}')
-				solvedWithRuleOfThumb = True
+				solvedWithRuleOfThumb = (numEnqueuedSafe > 0)
 			else:
 				if effective_label > 0:
 					# if the tile has been uncovered before
@@ -163,7 +166,8 @@ class MyAI( AI ):
 		self.uncoveredQueue = recheckQueue
 
 		if not solvedWithRuleOfThumb:
-			if len(list(self.moveQueue.queue)) > 1:
+			# need to invoke this 
+			if len(list(self.moveQueue.queue)) > 0:
 				return
 
 			# if theres no more moves to make
@@ -334,7 +338,6 @@ class MyAI( AI ):
 		recursivelyGenerateMineConfig(possibleMineSpace, currentConfig, allConfigs, 0)
 
 		return allConfigs
-
 		
 		
 	def getTotalMinesLeft(self):
@@ -379,6 +382,8 @@ class MyAI( AI ):
 
 
 	def markAllNeighborsAsMines(self, x, y):
+		numMarkedNeighbors = 0
+		# we use this to keep track of whether this rule of thumb did anything, if not we don't count it as solved with rule of thumb
 		for dx in [-1, 0, 1]:
 			for dy in [-1, 0, 1]:
 				if dx == 0 and dy == 0:
@@ -388,7 +393,7 @@ class MyAI( AI ):
 					# print("?")					
 					if self.gameBoard[nx][ny] is None and (nx, ny, AI.Action.FLAG) not in self.moveSet:
 						self.moveQueue.put((nx, ny, AI.Action.FLAG))
-
+						numMarkedNeighbors += 1
 						for move in self.moveQueue.queue:
 							if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.FLAG:
 								# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
@@ -396,10 +401,13 @@ class MyAI( AI ):
 								self.moveQueue.queue.remove(move)
 								self.moveSet.remove(move)
 								break
+		return numMarkedNeighbors
 
 
 
 	def enqueueSafeMoves(self, x, y):
+		enqueuedSafeMoves = 0
+		# we use this to keep track of whether this rule of thumb did anything, if not we don't count it as solved with rule of thumb
 		for dx in [-1, 0, 1]:
 			for dy in [-1, 0, 1]:
 				if dx == 0 and dy == 0:
@@ -409,6 +417,7 @@ class MyAI( AI ):
 					if self.gameBoard[nx][ny] is None and (nx, ny, AI.Action.UNCOVER) not in self.moveSet: 
 						# print('Enqueuing uncover', nx, ny)
 						self.moveQueue.put((nx, ny, AI.Action.UNCOVER))
+						enqueuedSafeMoves += 1
 						# prevent duplicates                        
 						self.moveSet.add((nx, ny, AI.Action.UNCOVER))
 
@@ -419,6 +428,8 @@ class MyAI( AI ):
 								self.moveQueue.queue.remove(move)
 								self.moveSet.remove(move)
 								break
+		
+		return enqueuedSafeMoves
 						
 
 
@@ -445,8 +456,8 @@ class MyAI( AI ):
 		self.visitedTiles.add((self.lastActionCoord[0], self.lastActionCoord[1]))
 		self.enqueueAllUnexploredNeighbors(self.lastActionCoord[0], self.lastActionCoord[1])
 
-		# print(f'Uncovered: {sorted(list(self.uncoveredQueue.queue))}')
-		# print(f'Frontier: {sorted(list(self.frontierSet))}')
+		# print(f'Uncovered Frontier: {sorted(list(self.uncoveredQueue.queue))}')
+		# print(f'Covered Frontier: {sorted(list(self.frontierSet))}')
 
 		self.solve()
 
