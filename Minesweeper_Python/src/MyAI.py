@@ -43,6 +43,9 @@ class MyAI( AI ):
         
 		self.enqueuedCoords = set()
 
+		self.enqueuedInFrontier = set()
+		self.visitedTiles = set()
+
 		self.debugPrints = False
 		pass
 		########################################################################
@@ -103,13 +106,19 @@ class MyAI( AI ):
 					continue  # Skip the current tile itself
 				indexX, indexY = x + changeX, y + changeY
 				if 0 <= indexX < self.rowDimension and 0 <= indexY < self.colDimension:
-					if self.gameBoard[indexX][indexY] is None:  # Check if the tile is unexplored
+					# if self.gameBoard[indexX][indexY] is not None and (indexX,indexY) not in self.visitedTiles:  # Check if the tile is unexplored
+					if self.gameBoard[indexX][indexY] is None: 
 						# Create a unique identifier for the coordinate
 						coord = indexX, indexY
-						temp_queue.append(coord)
+						# print(f'Add {coord} to frontier')
+						if coord not in self.enqueuedInFrontier:
+							# prevents duplicates
+							temp_queue.append(coord)
 		# Enqueue all unique and valid neighbors found
 		for coord in temp_queue:
 			self.frontierQueue.put(coord)
+			# prevents duplicates
+			self.enqueuedInFrontier.add(coord)
 			
 	def solve(self):
 		# print(list(self.frontierQueue.queue))
@@ -120,26 +129,30 @@ class MyAI( AI ):
 		# if rule of thumb can't be applied now, check it again later        
 		while not self.frontierQueue.empty():
 			x, y = self.frontierQueue.get()
+			# print(f'Try to apply rule of thumb to {x,y}')
 			effective_label = self.effectiveLabel(x, y)
 			num_unmarked_neighbors = self.numUnMarkedNeighbors(x, y)
 			if effective_label == num_unmarked_neighbors:
 				# All unmarked neighbors are mines
 				self.markAllNeighborsAsMines(x, y)
+				# print(f'All neighbors rule applied to {x,y}')
 				solvedWithRuleOfThumb = True
 			elif effective_label == 0:               
 				self.enqueueSafeMoves(x, y)
+				# print(f'Effective Label 0 rule applied to {x,y}')
 				solvedWithRuleOfThumb = True
 			else:
 				if effective_label > 0:
 					# if the tile has been uncovered before
-					# print(f'{x+1},{y+1} could not have rule of thumb applied, re check later')                
+					# print(f'{x,y} could not have rule of thumb applied, re check later')                
 					recheckFrontier.put((x,y))
 		self.frontierQueue = recheckFrontier
 
 		if not solvedWithRuleOfThumb:
 			if len(list(self.moveQueue.queue)) > 1:
-				# if there are more moves to make keep performing moves in the move queue
 				return
+
+			# if theres no more moves to make
 			# choose the least risky move
 			self.chooseLeastRiskyMove()
 			
@@ -150,7 +163,7 @@ class MyAI( AI ):
 			f = math.factorial
 			return (f(n)/(f(k)*f(n-k)))
 
-		if self.debugPrints: print('Use probability')
+		# print('Use probability')
 		# right now frontier contains the edgemost uncovered tiles with labels, we need to use these to estimate
 
 		# set frontier tiles to their effective labels
@@ -226,7 +239,7 @@ class MyAI( AI ):
 				least_risky_tile = tile
 		
 		x,y = least_risky_tile
-		if self.debugPrints: print(f'Uncovering least risky tile: {least_risky_tile}')
+		# print(f'Uncovering least risky tile: {least_risky_tile}')
 		self.moveQueue.put((x, y, AI.Action.UNCOVER))
 		# prevent duplicates                        
 		self.enqueuedCoords.add((x,y))
@@ -317,9 +330,6 @@ class MyAI( AI ):
 		totalMinesLeft = self.totalMines - totalMinesFlagged
 		return totalMinesLeft
 
-	
-			
-		
 
 	def getUnflaggedNeighbours(self, x, y):
 		unflaggedNeighbours = set()
@@ -361,8 +371,17 @@ class MyAI( AI ):
 					# print("?")					
 					if self.gameBoard[nx][ny] is None:
 						self.moveQueue.put((nx, ny, AI.Action.FLAG))
-						# self.unknownTilesLeft -= 1
-						# self.totalMinesLeft -= 1
+
+
+						for move in self.moveQueue.queue:
+							if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.FLAG:
+								# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
+								# if we can confirm with 100% certainty that move is wrong, we should remove it
+								self.moveQueue.queue.remove(move)
+								self.enqueuedCoords.remove((nx,ny))
+								break
+
+
 
 	def enqueueSafeMoves(self, x, y):
 		for dx in [-1, 0, 1]:
@@ -376,8 +395,16 @@ class MyAI( AI ):
 						self.moveQueue.put((nx, ny, AI.Action.UNCOVER))
 						# prevent duplicates                        
 						self.enqueuedCoords.add((nx,ny))
-						# self.unknownTilesLeft -= 1
+
+						for move in self.moveQueue.queue:
+							if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.UNCOVER:
+								# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
+								# if we can confirm with 100% certainty that move is wrong, we should remove it
+								self.moveQueue.queue.remove(move)
+								break
 						
+
+
 	def getAction(self, number: int) -> "Action Object":
 		########################################################################
 		#							YOUR CODE BEGINS						   #
@@ -395,13 +422,17 @@ class MyAI( AI ):
 			else:
 				self.gameBoard[self.lastActionCoord[0]][self.lastActionCoord[1]] = -1
 		self.frontierQueue.put((self.lastActionCoord[0], self.lastActionCoord[1]))
+		self.visitedTiles.add((self.lastActionCoord[0], self.lastActionCoord[1]))
 		self.enqueueAllUnexploredNeighbors(self.lastActionCoord[0], self.lastActionCoord[1])
+
 		# print(f'Frontier: {list(self.frontierQueue.queue)}')
+
 		self.solve()
+
 		# print(f'After going through frontier and ruling out all moves solvable with rule of thumb: {list(self.frontierQueue.queue)}')
-		if self.debugPrints: print(f'Safe moves:')
-		for move in self.moveQueue.queue:
-			if self.debugPrints: print(move)
+		# print(f'Safe moves:')
+		# for move in self.moveQueue.queue:
+		# 	print(move)
 
 		# self.debugPrintBoard()
 		

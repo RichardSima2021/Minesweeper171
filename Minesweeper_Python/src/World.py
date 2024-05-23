@@ -166,7 +166,7 @@ class World():
 		elif move == AI.Action.UNCOVER:
 			if self.__board[X][Y].mine:
 				if type(self.__ai) == ManualAI or self.__debug:
-					print("Gameover! Uncovered a mine! " + str(X+1), str(Y+1))
+					print("Gameover! Uncovered a mine! " + str(X), str(Y))
 				return True 						# Agent uncovered a mine
 			if type(self.__ai) == ManualAI:
 				print("Uncovering: " + str(X+1) + ", " + str(Y+1))
