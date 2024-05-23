@@ -39,13 +39,11 @@ class MyAI( AI ):
 		# queue of moves based on game board
 		#
 		self.frontierQueue = Queue()
-		self.moveQueue = Queue()
-		self.secondFrontier = Queue()
 
 		self.enqueuedInFrontier = set()
 		self.visitedTiles = set()
 
-		self.uncoveredQueue = Queue()
+		self.uncoveredSet = set()
 		self.frontierSet = {(startX,startY)}
 		self.moveSet = set()
 
@@ -128,7 +126,7 @@ class MyAI( AI ):
 			
 	def solve(self):
 		# print(list(self.frontierQueue.queue))
-		recheckQueue = Queue()
+		recheckSet = set()
 		
 		solvedWithRuleOfThumb = False
 
@@ -137,15 +135,14 @@ class MyAI( AI ):
 			for row in range(len(self.gameBoard)):
 				for col in range(len(self.gameBoard[row])):
 					if self.gameBoard[row][col] is None:
-						# self.moveQueue.put((row, col, AI.Action.UNCOVER))
 						# prevent duplicates                        
 						self.moveSet.add((row, col, AI.Action.UNCOVER))
 						# prevent frontierSet key not found bug
 						self.frontierSet.add((row,col))
 
 		# if rule of thumb can't be applied now, check it again later        
-		while not self.uncoveredQueue.empty():
-			x, y = self.uncoveredQueue.get()
+		while len(self.uncoveredSet):
+			x, y = self.uncoveredSet.pop()
 			# print(f'Try to apply rule of thumb to {x,y}')
 			effective_label = self.effectiveLabel(x, y)
 			num_unmarked_neighbors = self.numUnMarkedNeighbors(x, y)
@@ -162,19 +159,22 @@ class MyAI( AI ):
 				if effective_label > 0:
 					# if the tile has been uncovered before
 					# print(f'{x,y} could not have rule of thumb applied, re check later')                
-					recheckQueue.put((x,y))
-		self.uncoveredQueue = recheckQueue
+					recheckSet.add((x,y))
+		self.uncoveredSet = recheckSet
 
 		if not solvedWithRuleOfThumb:
 			# need to invoke this 
-			# if len(list(self.moveQueue.queue)) > 0:
-			# 	return
 			if len(list(self.moveSet)) > 0:
 				return
 
 			# if theres no more moves to make
 			# choose the least risky move
 			self.chooseLeastRiskyMove()
+			# self.chooseLeastRiskyTileset()
+
+	def chooseLeastRiskyTileset(self):
+		pass
+
 			
 	
 	def chooseLeastRiskyMove(self):
@@ -188,7 +188,7 @@ class MyAI( AI ):
 
 		# set frontier tiles to their effective labels
 		effectiveEdgeTiles = dict()
-		for tile in self.uncoveredQueue.queue:
+		for tile in self.uncoveredSet:
 			x, y = tile
 			effectiveEdgeTiles[(x,y)] = self.effectiveLabel(x,y)
 		
@@ -263,7 +263,6 @@ class MyAI( AI ):
 		# print(f'Uncovering least risky tile: {least_risky_tile}')
 
 		self.frontierSet.add((x,y))
-		# self.moveQueue.put((x, y, AI.Action.UNCOVER))
 		# prevent duplicates                        
 		self.moveSet.add((x, y, AI.Action.UNCOVER))
 
@@ -394,19 +393,11 @@ class MyAI( AI ):
 				if 0 <= nx < self.rowDimension and 0 <= ny < self.colDimension:
 					# print("?")					
 					if self.gameBoard[nx][ny] is None and (nx, ny, AI.Action.FLAG) not in self.moveSet:
-						# self.moveQueue.put((nx, ny, AI.Action.FLAG))
 						self.moveSet.add((nx, ny, AI.Action.FLAG))
 						numMarkedNeighbors += 1
 
 						if (nx, ny, AI.Action.UNCOVER) in self.moveSet:
 							self.moveSet.remove((nx, ny, AI.Action.UNCOVER))
-						# for move in self.moveQueue.queue:
-						# 	if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.FLAG:
-						# 		# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
-						# 		# if we can confirm with 100% certainty that move is wrong, we should remove it
-						# 		self.moveQueue.queue.remove(move)
-						# 		self.moveSet.remove(move)
-						# 		break
 		return numMarkedNeighbors
 
 
@@ -421,22 +412,12 @@ class MyAI( AI ):
 				nx, ny = x + dx, y + dy
 				if 0 <= nx < self.rowDimension and 0 <= ny < self.colDimension:
 					if self.gameBoard[nx][ny] is None and (nx, ny, AI.Action.UNCOVER) not in self.moveSet: 
-						# print('Enqueuing uncover', nx, ny)
-						# self.moveQueue.put((nx, ny, AI.Action.UNCOVER))
 						enqueuedSafeMoves += 1
 						# prevent duplicates                        
 						self.moveSet.add((nx, ny, AI.Action.UNCOVER))
 
 						if (nx, ny, AI.Action.FLAG) in self.moveSet:
 							self.moveSet.remove((nx, ny, AI.Action.FLAG))
-
-						# for move in self.moveQueue.queue:
-						# 	if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.UNCOVER:
-						# 		# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
-						# 		# if we can confirm with 100% certainty that move is wrong, we should remove it
-						# 		self.moveQueue.queue.remove(move)
-						# 		self.moveSet.remove(move)
-						# 		break
 		
 		return enqueuedSafeMoves
 						
@@ -458,27 +439,25 @@ class MyAI( AI ):
 			else:
 				self.gameBoard[self.lastActionCoord[0]][self.lastActionCoord[1]] = -1
 
-		self.uncoveredQueue.put((self.lastActionCoord[0], self.lastActionCoord[1]))
+		self.uncoveredSet.add((self.lastActionCoord[0], self.lastActionCoord[1]))
 		self.frontierSet.remove((self.lastActionCoord[0], self.lastActionCoord[1]))
 		# self.frontierQueue.put((self.lastActionCoord[0], self.lastActionCoord[1]))
 		self.visitedTiles.add((self.lastActionCoord[0], self.lastActionCoord[1]))
 		self.enqueueAllUnexploredNeighbors(self.lastActionCoord[0], self.lastActionCoord[1])
 
-		# print(f'Uncovered Frontier: {sorted(list(self.uncoveredQueue.queue))}')
+		# print(f'Uncovered Frontier: {sorted(list(self.uncoveredSet))}')
 		# print(f'Covered Frontier: {sorted(list(self.frontierSet))}')
 
 		self.solve()
 
-		# print(f'After going through uncovered and ruling out all moves solvable with rule of thumb: {list(self.uncoveredQueue.queue)}')
+		# print(f'After going through uncovered and ruling out all moves solvable with rule of thumb: {list(self.uncoveredSet)}')
 		# print(f'Safe moves:')
 		# for move in self.moveSet:
 		# 	print(move)
 
 		# self.debugPrintBoard()
 		
-		# while not self.moveQueue.empty():
 		while len(self.moveSet) > 0:
-			# nx, ny, action = self.moveQueue.get()
 			nx, ny, action = self.moveSet.pop()
 			if self.gameBoard[nx][ny] != None:
 				continue
