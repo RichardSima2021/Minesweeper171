@@ -137,7 +137,7 @@ class MyAI( AI ):
 			for row in range(len(self.gameBoard)):
 				for col in range(len(self.gameBoard[row])):
 					if self.gameBoard[row][col] is None:
-						self.moveQueue.put((row, col, AI.Action.UNCOVER))
+						# self.moveQueue.put((row, col, AI.Action.UNCOVER))
 						# prevent duplicates                        
 						self.moveSet.add((row, col, AI.Action.UNCOVER))
 						# prevent frontierSet key not found bug
@@ -167,7 +167,9 @@ class MyAI( AI ):
 
 		if not solvedWithRuleOfThumb:
 			# need to invoke this 
-			if len(list(self.moveQueue.queue)) > 0:
+			# if len(list(self.moveQueue.queue)) > 0:
+			# 	return
+			if len(list(self.moveSet)) > 0:
 				return
 
 			# if theres no more moves to make
@@ -181,7 +183,7 @@ class MyAI( AI ):
 			f = math.factorial
 			return (f(n)/(f(k)*f(n-k)))
 
-		# print('Use probability')
+		print('Use probability')
 		# right now uncovered contains the edgemost uncovered tiles with labels, we need to use these to estimate
 
 		# set frontier tiles to their effective labels
@@ -190,7 +192,7 @@ class MyAI( AI ):
 			x, y = tile
 			effectiveEdgeTiles[(x,y)] = self.effectiveLabel(x,y)
 		
-		# print('Effective frontier', effectiveEdgeTiles)
+		# print('Effective edge tiles', effectiveEdgeTiles)
 
 		possibleMineSpace = set()
 		neighboursOfTile = dict()
@@ -222,7 +224,7 @@ class MyAI( AI ):
 
 
 		for config in possibleMineConfigs:
-			if self.debugPrints: print(f'Assuming config: {config}')
+			# print(f'Assuming config: {config}')
 			remainingMines = totalMinesLeft - len(config)
 			remainingTiles = self.unknownTilesLeft - len(possibleMineSpace)
 
@@ -261,7 +263,7 @@ class MyAI( AI ):
 		# print(f'Uncovering least risky tile: {least_risky_tile}')
 
 		self.frontierSet.add((x,y))
-		self.moveQueue.put((x, y, AI.Action.UNCOVER))
+		# self.moveQueue.put((x, y, AI.Action.UNCOVER))
 		# prevent duplicates                        
 		self.moveSet.add((x, y, AI.Action.UNCOVER))
 
@@ -273,7 +275,7 @@ class MyAI( AI ):
 				# base case no more possible mine spaces
 				if fullConfigValid(currentConfig):
 					allConfigs.append(currentConfig.copy())
-				# print(currentConfig, 'is a valid full mine config')
+					# print(currentConfig, 'is a valid full mine config')
 				return
 			
 			# recursive case: test if mine is placed there and also if it is not
@@ -392,15 +394,19 @@ class MyAI( AI ):
 				if 0 <= nx < self.rowDimension and 0 <= ny < self.colDimension:
 					# print("?")					
 					if self.gameBoard[nx][ny] is None and (nx, ny, AI.Action.FLAG) not in self.moveSet:
-						self.moveQueue.put((nx, ny, AI.Action.FLAG))
+						# self.moveQueue.put((nx, ny, AI.Action.FLAG))
+						self.moveSet.add((nx, ny, AI.Action.FLAG))
 						numMarkedNeighbors += 1
-						for move in self.moveQueue.queue:
-							if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.FLAG:
-								# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
-								# if we can confirm with 100% certainty that move is wrong, we should remove it
-								self.moveQueue.queue.remove(move)
-								self.moveSet.remove(move)
-								break
+
+						if (nx, ny, AI.Action.UNCOVER) in self.moveSet:
+							self.moveSet.remove((nx, ny, AI.Action.UNCOVER))
+						# for move in self.moveQueue.queue:
+						# 	if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.FLAG:
+						# 		# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
+						# 		# if we can confirm with 100% certainty that move is wrong, we should remove it
+						# 		self.moveQueue.queue.remove(move)
+						# 		self.moveSet.remove(move)
+						# 		break
 		return numMarkedNeighbors
 
 
@@ -416,18 +422,21 @@ class MyAI( AI ):
 				if 0 <= nx < self.rowDimension and 0 <= ny < self.colDimension:
 					if self.gameBoard[nx][ny] is None and (nx, ny, AI.Action.UNCOVER) not in self.moveSet: 
 						# print('Enqueuing uncover', nx, ny)
-						self.moveQueue.put((nx, ny, AI.Action.UNCOVER))
+						# self.moveQueue.put((nx, ny, AI.Action.UNCOVER))
 						enqueuedSafeMoves += 1
 						# prevent duplicates                        
 						self.moveSet.add((nx, ny, AI.Action.UNCOVER))
 
-						for move in self.moveQueue.queue:
-							if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.UNCOVER:
-								# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
-								# if we can confirm with 100% certainty that move is wrong, we should remove it
-								self.moveQueue.queue.remove(move)
-								self.moveSet.remove(move)
-								break
+						if (nx, ny, AI.Action.FLAG) in self.moveSet:
+							self.moveSet.remove((nx, ny, AI.Action.FLAG))
+
+						# for move in self.moveQueue.queue:
+						# 	if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.UNCOVER:
+						# 		# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
+						# 		# if we can confirm with 100% certainty that move is wrong, we should remove it
+						# 		self.moveQueue.queue.remove(move)
+						# 		self.moveSet.remove(move)
+						# 		break
 		
 		return enqueuedSafeMoves
 						
@@ -440,7 +449,6 @@ class MyAI( AI ):
 		# print('debug')
 		# return Action(AI.Action.UNCOVER, 0, 0)
 		########################################################################
-		# print(list(self.moveQueue.queue))
 		# check the number returned, update gameBoard accordingly, if it is -1, check if existing is None(unflagged) or -1(flagged), update accordingly
 		if number != -1:
 			self.gameBoard[self.lastActionCoord[0]][self.lastActionCoord[1]] = number
@@ -463,13 +471,15 @@ class MyAI( AI ):
 
 		# print(f'After going through uncovered and ruling out all moves solvable with rule of thumb: {list(self.uncoveredQueue.queue)}')
 		# print(f'Safe moves:')
-		# for move in self.moveQueue.queue:
+		# for move in self.moveSet:
 		# 	print(move)
 
 		# self.debugPrintBoard()
 		
-		while not self.moveQueue.empty():
-			nx, ny, action = self.moveQueue.get()
+		# while not self.moveQueue.empty():
+		while len(self.moveSet) > 0:
+			# nx, ny, action = self.moveQueue.get()
+			nx, ny, action = self.moveSet.pop()
 			if self.gameBoard[nx][ny] != None:
 				continue
 			self.lastActionCoord = nx, ny
