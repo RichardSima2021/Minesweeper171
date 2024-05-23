@@ -46,6 +46,9 @@ class MyAI( AI ):
 		self.enqueuedInFrontier = set()
 		self.visitedTiles = set()
 
+		self.uncoveredQueue = Queue()
+		self.frontierSet = {(startX,startY)}
+
 		self.debugPrints = False
 		pass
 		########################################################################
@@ -116,19 +119,20 @@ class MyAI( AI ):
 							temp_queue.append(coord)
 		# Enqueue all unique and valid neighbors found
 		for coord in temp_queue:
-			self.frontierQueue.put(coord)
+			# self.frontierQueue.put(coord)
+			self.frontierSet.add(coord)
 			# prevents duplicates
 			self.enqueuedInFrontier.add(coord)
 			
 	def solve(self):
 		# print(list(self.frontierQueue.queue))
-		recheckFrontier = Queue()
+		recheckQueue = Queue()
 		
 		solvedWithRuleOfThumb = False
 
 		# if rule of thumb can't be applied now, check it again later        
-		while not self.frontierQueue.empty():
-			x, y = self.frontierQueue.get()
+		while not self.uncoveredQueue.empty():
+			x, y = self.uncoveredQueue.get()
 			# print(f'Try to apply rule of thumb to {x,y}')
 			effective_label = self.effectiveLabel(x, y)
 			num_unmarked_neighbors = self.numUnMarkedNeighbors(x, y)
@@ -145,8 +149,8 @@ class MyAI( AI ):
 				if effective_label > 0:
 					# if the tile has been uncovered before
 					# print(f'{x,y} could not have rule of thumb applied, re check later')                
-					recheckFrontier.put((x,y))
-		self.frontierQueue = recheckFrontier
+					recheckQueue.put((x,y))
+		self.uncoveredQueue = recheckQueue
 
 		if not solvedWithRuleOfThumb:
 			if len(list(self.moveQueue.queue)) > 1:
@@ -163,21 +167,21 @@ class MyAI( AI ):
 			f = math.factorial
 			return (f(n)/(f(k)*f(n-k)))
 
-		# print('Use probability')
-		# right now frontier contains the edgemost uncovered tiles with labels, we need to use these to estimate
+		print('Use probability')
+		# right now uncovered contains the edgemost uncovered tiles with labels, we need to use these to estimate
 
 		# set frontier tiles to their effective labels
-		effectiveFrontier = dict()
-		for tile in self.frontierQueue.queue:
+		effectiveEdgeTiles = dict()
+		for tile in self.uncoveredQueue.queue:
 			x, y = tile
-			effectiveFrontier[(x,y)] = self.effectiveLabel(x,y)
+			effectiveEdgeTiles[(x,y)] = self.effectiveLabel(x,y)
 		
-		if self.debugPrints: print('Effective frontier', effectiveFrontier)
+		# print('Effective frontier', effectiveEdgeTiles)
 
 		possibleMineSpace = set()
 		neighboursOfTile = dict()
 		# get tile space where mines could be places
-		for tile in effectiveFrontier.keys():
+		for tile in effectiveEdgeTiles.keys():
 			(x,y) = tile
 			neighbours = self.getUnflaggedNeighbours(x,y)
 			for coord in neighbours:
@@ -187,13 +191,13 @@ class MyAI( AI ):
 			neighboursOfTile[(x,y)] = neighbours
 
 
-		if self.debugPrints: print('Possible Mine locations: ', possibleMineSpace)
+		# print('Possible Mine locations: ', possibleMineSpace)
 
 		# the rest of the board is all uncovered tiles minus possibleMineSpce
-		possibleMineConfigs = self.generateMineConfigs(list(possibleMineSpace), effectiveFrontier)
+		possibleMineConfigs = self.generateMineConfigs(list(possibleMineSpace), effectiveEdgeTiles)
 		# this generates all possible valid mine configs based on the current board
 
-		if self.debugPrints: print(possibleMineConfigs)
+		# print(possibleMineConfigs)
 
 		tileMineCounts = {tile: 0 for tile in possibleMineSpace}
 		# maps each tile to the number of times a mine could be on it
@@ -224,7 +228,7 @@ class MyAI( AI ):
 			else:
 				tileMineProbabilities[tile] = 0
 		
-		if self.debugPrints: print('Probabilities that a mine is in each tile: ', tileMineProbabilities)
+		print('Probabilities that a mine is in each tile: ', tileMineProbabilities)
 
 		if tileMineProbabilities == {}:
 			# if last action in move queue is an unflag we're done
@@ -239,7 +243,9 @@ class MyAI( AI ):
 				least_risky_tile = tile
 		
 		x,y = least_risky_tile
-		# print(f'Uncovering least risky tile: {least_risky_tile}')
+
+		print(f'Uncovering least risky tile: {least_risky_tile}')
+
 		self.moveQueue.put((x, y, AI.Action.UNCOVER))
 		# prevent duplicates                        
 		self.enqueuedCoords.add((x,y))
@@ -371,7 +377,7 @@ class MyAI( AI ):
 					# print("?")					
 					if self.gameBoard[nx][ny] is None:
 						self.moveQueue.put((nx, ny, AI.Action.FLAG))
-
+						# self.frontierSet.remove((nx,ny))
 
 						for move in self.moveQueue.queue:
 							if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.FLAG:
@@ -393,6 +399,7 @@ class MyAI( AI ):
 					if self.gameBoard[nx][ny] is None and (nx,ny) not in self.enqueuedCoords: 
 						# print('Enqueuing uncover', nx, ny)
 						self.moveQueue.put((nx, ny, AI.Action.UNCOVER))
+						# self.frontierSet.remove((nx,ny))
 						# prevent duplicates                        
 						self.enqueuedCoords.add((nx,ny))
 
@@ -421,18 +428,22 @@ class MyAI( AI ):
 				self.gameBoard[self.lastActionCoord[0]][self.lastActionCoord[1]] = None
 			else:
 				self.gameBoard[self.lastActionCoord[0]][self.lastActionCoord[1]] = -1
-		self.frontierQueue.put((self.lastActionCoord[0], self.lastActionCoord[1]))
+
+		self.uncoveredQueue.put((self.lastActionCoord[0], self.lastActionCoord[1]))
+		self.frontierSet.remove((self.lastActionCoord[0], self.lastActionCoord[1]))
+		# self.frontierQueue.put((self.lastActionCoord[0], self.lastActionCoord[1]))
 		self.visitedTiles.add((self.lastActionCoord[0], self.lastActionCoord[1]))
 		self.enqueueAllUnexploredNeighbors(self.lastActionCoord[0], self.lastActionCoord[1])
 
-		# print(f'Frontier: {list(self.frontierQueue.queue)}')
+		print(f'Uncovered: {sorted(list(self.uncoveredQueue.queue))}')
+		print(f'Frontier: {sorted(list(self.frontierSet))}')
 
 		self.solve()
 
-		# print(f'After going through frontier and ruling out all moves solvable with rule of thumb: {list(self.frontierQueue.queue)}')
-		# print(f'Safe moves:')
-		# for move in self.moveQueue.queue:
-		# 	print(move)
+		print(f'After going through uncovered and ruling out all moves solvable with rule of thumb: {list(self.uncoveredQueue.queue)}')
+		print(f'Safe moves:')
+		for move in self.moveQueue.queue:
+			print(move)
 
 		# self.debugPrintBoard()
 		
@@ -445,6 +456,8 @@ class MyAI( AI ):
 			return Action(action, nx, ny)
 		# default action
 		return Action(AI.Action.LEAVE)	
+	
+
 		########################################################################
 		#							YOUR CODE ENDS							   #
 		########################################################################
