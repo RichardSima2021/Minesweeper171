@@ -40,14 +40,13 @@ class MyAI( AI ):
 		self.frontierQueue = Queue()
 		self.moveQueue = Queue()
 		self.secondFrontier = Queue()
-        
-		self.enqueuedCoords = set()
 
 		self.enqueuedInFrontier = set()
 		self.visitedTiles = set()
 
 		self.uncoveredQueue = Queue()
 		self.frontierSet = {(startX,startY)}
+		self.moveSet = set()
 
 		self.debugPrints = False
 		pass
@@ -130,6 +129,17 @@ class MyAI( AI ):
 		
 		solvedWithRuleOfThumb = False
 
+		if self.getTotalMinesLeft() == 0:
+			# if no mines left uncover all tiles
+			for row in range(len(self.gameBoard)):
+				for col in range(len(self.gameBoard[row])):
+					if self.gameBoard[row][col] is None:
+						self.moveQueue.put((row, col, AI.Action.UNCOVER))
+						# prevent duplicates                        
+						self.moveSet.add((row, col, AI.Action.UNCOVER))
+						# prevent frontierSet key not found bug
+						self.frontierSet.add((row,col))
+
 		# if rule of thumb can't be applied now, check it again later        
 		while not self.uncoveredQueue.empty():
 			x, y = self.uncoveredQueue.get()
@@ -167,7 +177,7 @@ class MyAI( AI ):
 			f = math.factorial
 			return (f(n)/(f(k)*f(n-k)))
 
-		print('Use probability')
+		# print('Use probability')
 		# right now uncovered contains the edgemost uncovered tiles with labels, we need to use these to estimate
 
 		# set frontier tiles to their effective labels
@@ -228,7 +238,7 @@ class MyAI( AI ):
 			else:
 				tileMineProbabilities[tile] = 0
 		
-		print('Probabilities that a mine is in each tile: ', tileMineProbabilities)
+		# print('Probabilities that a mine is in each tile: ', tileMineProbabilities)
 
 		if tileMineProbabilities == {}:
 			# if last action in move queue is an unflag we're done
@@ -244,11 +254,12 @@ class MyAI( AI ):
 		
 		x,y = least_risky_tile
 
-		print(f'Uncovering least risky tile: {least_risky_tile}')
+		# print(f'Uncovering least risky tile: {least_risky_tile}')
 
+		self.frontierSet.add((x,y))
 		self.moveQueue.put((x, y, AI.Action.UNCOVER))
 		# prevent duplicates                        
-		self.enqueuedCoords.add((x,y))
+		self.moveSet.add((x, y, AI.Action.UNCOVER))
 
 	
 
@@ -375,16 +386,15 @@ class MyAI( AI ):
 				nx, ny = x + dx, y + dy
 				if 0 <= nx < self.rowDimension and 0 <= ny < self.colDimension:
 					# print("?")					
-					if self.gameBoard[nx][ny] is None:
+					if self.gameBoard[nx][ny] is None and (nx, ny, AI.Action.FLAG) not in self.moveSet:
 						self.moveQueue.put((nx, ny, AI.Action.FLAG))
-						# self.frontierSet.remove((nx,ny))
 
 						for move in self.moveQueue.queue:
 							if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.FLAG:
 								# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
 								# if we can confirm with 100% certainty that move is wrong, we should remove it
 								self.moveQueue.queue.remove(move)
-								self.enqueuedCoords.remove((nx,ny))
+								self.moveSet.remove(move)
 								break
 
 
@@ -396,18 +406,18 @@ class MyAI( AI ):
 					continue
 				nx, ny = x + dx, y + dy
 				if 0 <= nx < self.rowDimension and 0 <= ny < self.colDimension:
-					if self.gameBoard[nx][ny] is None and (nx,ny) not in self.enqueuedCoords: 
+					if self.gameBoard[nx][ny] is None and (nx, ny, AI.Action.UNCOVER) not in self.moveSet: 
 						# print('Enqueuing uncover', nx, ny)
 						self.moveQueue.put((nx, ny, AI.Action.UNCOVER))
-						# self.frontierSet.remove((nx,ny))
 						# prevent duplicates                        
-						self.enqueuedCoords.add((nx,ny))
+						self.moveSet.add((nx, ny, AI.Action.UNCOVER))
 
 						for move in self.moveQueue.queue:
 							if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.UNCOVER:
 								# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
 								# if we can confirm with 100% certainty that move is wrong, we should remove it
 								self.moveQueue.queue.remove(move)
+								self.moveSet.remove(move)
 								break
 						
 
@@ -435,15 +445,15 @@ class MyAI( AI ):
 		self.visitedTiles.add((self.lastActionCoord[0], self.lastActionCoord[1]))
 		self.enqueueAllUnexploredNeighbors(self.lastActionCoord[0], self.lastActionCoord[1])
 
-		print(f'Uncovered: {sorted(list(self.uncoveredQueue.queue))}')
-		print(f'Frontier: {sorted(list(self.frontierSet))}')
+		# print(f'Uncovered: {sorted(list(self.uncoveredQueue.queue))}')
+		# print(f'Frontier: {sorted(list(self.frontierSet))}')
 
 		self.solve()
 
-		print(f'After going through uncovered and ruling out all moves solvable with rule of thumb: {list(self.uncoveredQueue.queue)}')
-		print(f'Safe moves:')
-		for move in self.moveQueue.queue:
-			print(move)
+		# print(f'After going through uncovered and ruling out all moves solvable with rule of thumb: {list(self.uncoveredQueue.queue)}')
+		# print(f'Safe moves:')
+		# for move in self.moveQueue.queue:
+		# 	print(move)
 
 		# self.debugPrintBoard()
 		

@@ -343,7 +343,7 @@ class World():
 
 	def __printAgentInfo(self) -> None:
 		""" Prints information about the board that are useful to the user """
-		print("Tiles covered: " + str(self.__coveredTiles) + " | Flags left: " + str(self.__flagsLeft) + " | Last action: {} on {}".format(self.__lastAction, self.__lastTile))
+		print("Tiles covered: " + str(self.__coveredTiles) + " | Flags left: " + str(self.__flagsLeft) + " | Last action: {} on {}".format(self.__lastAction, (self.__lastTile[0]-1, self.__lastTile[1]-1)))
 
 
 	def __printActionInfo(self) -> None:
