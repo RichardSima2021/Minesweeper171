@@ -138,12 +138,12 @@ class MyAI( AI ):
 				for col in range(len(self.gameBoard[row])):
 					if self.gameBoard[row][col] is None:
 						# self.moveQueue.put((row, col, AI.Action.UNCOVER))
-						# prevent duplicates                        
+						# prevent duplicates						
 						self.moveSet.add((row, col, AI.Action.UNCOVER))
 						# prevent frontierSet key not found bug
 						self.frontierSet.add((row,col))
 
-		# if rule of thumb can't be applied now, check it again later        
+		# if rule of thumb can't be applied now, check it again later		
 		while not self.uncoveredQueue.empty():
 			x, y = self.uncoveredQueue.get()
 			# print(f'Try to apply rule of thumb to {x,y}')
@@ -154,14 +154,14 @@ class MyAI( AI ):
 				numMarkedNeighbors = self.markAllNeighborsAsMines(x, y)
 				# print(f'All neighbors rule applied to {x,y}')
 				solvedWithRuleOfThumb = (numMarkedNeighbors > 0)
-			elif effective_label == 0:               
+			elif effective_label == 0:			   
 				numEnqueuedSafe = self.enqueueSafeMoves(x, y)
 				# print(f'Effective Label 0 rule applied to {x,y}')
 				solvedWithRuleOfThumb = (numEnqueuedSafe > 0)
 			else:
 				if effective_label > 0:
 					# if the tile has been uncovered before
-					# print(f'{x,y} could not have rule of thumb applied, re check later')                
+					# print(f'{x,y} could not have rule of thumb applied, re check later')				
 					recheckQueue.put((x,y))
 		self.uncoveredQueue = recheckQueue
 
@@ -178,95 +178,114 @@ class MyAI( AI ):
 			
 	
 	def chooseLeastRiskyMove(self):
-
 		def nCk(n, k):
 			f = math.factorial
-			return (f(n)/(f(k)*f(n-k)))
+			return f(n) // (f(k) * f(n - k))
 
 		print('Use probability')
-		# right now uncovered contains the edgemost uncovered tiles with labels, we need to use these to estimate
 
-		# set frontier tiles to their effective labels
-		effectiveEdgeTiles = dict()
-		for tile in self.uncoveredQueue.queue:
-			x, y = tile
-			effectiveEdgeTiles[(x,y)] = self.effectiveLabel(x,y)
-		
-		# print('Effective edge tiles', effectiveEdgeTiles)
+		effectiveEdgeTiles = {tile: self.effectiveLabel(tile[0], tile[1]) for tile in self.uncoveredQueue.queue}
 
 		possibleMineSpace = set()
-		neighboursOfTile = dict()
-		# get tile space where mines could be places
+		neighboursOfTile = {}
+
 		for tile in effectiveEdgeTiles.keys():
-			(x,y) = tile
-			neighbours = self.getUnflaggedNeighbours(x,y)
-			for coord in neighbours:
-				possibleMineSpace.add(coord)
-			
-			# remember where each tiles neighbours are so we can use it to check the mine arrangements
-			neighboursOfTile[(x,y)] = neighbours
+			x, y = tile
+			neighbours = self.getUnflaggedNeighbours(x, y)
+			possibleMineSpace.update(neighbours)
+			neighboursOfTile[(x, y)] = neighbours
 
+		connectedComponents = self.getConnectedComponents(possibleMineSpace, max_size=10)
 
-		# print('Possible Mine locations: ', possibleMineSpace)
+		allMineProbabilities = {}
+		for component in connectedComponents:
+			componentList = list(component)
+			componentMineConfigs = self.generateMineConfigs(componentList, effectiveEdgeTiles)
+			tileMineCounts = {tile: 0 for tile in componentList}
+			totalPossibilities = 0
+			totalMinesLeft = self.getTotalMinesLeft()
 
-		# the rest of the board is all uncovered tiles minus possibleMineSpce
-		possibleMineConfigs = self.generateMineConfigs(list(possibleMineSpace), effectiveEdgeTiles)
-		# this generates all possible valid mine configs based on the current board
+			for config in componentMineConfigs:
+				remainingMines = totalMinesLeft - len(config)
+				remainingTiles = self.unknownTilesLeft - len(possibleMineSpace)
 
-		# print(possibleMineConfigs)
+				if remainingTiles >= remainingMines >= 0:
+					numPossibilities = nCk(remainingTiles, remainingMines)
+					for tile in config:
+						tileMineCounts[tile] += numPossibilities
+					totalPossibilities += numPossibilities
 
-		tileMineCounts = {tile: 0 for tile in possibleMineSpace}
-		# maps each tile to the number of times a mine could be on it
+			for tile in tileMineCounts:
+				if totalPossibilities > 0:
+					allMineProbabilities[tile] = tileMineCounts[tile] / totalPossibilities
+				else:
+					allMineProbabilities[tile] = 0
 
-		totalPossibilities = 0
-
-		totalMinesLeft = self.getTotalMinesLeft()
-
-
-		for config in possibleMineConfigs:
-			# print(f'Assuming config: {config}')
-			remainingMines = totalMinesLeft - len(config)
-			remainingTiles = self.unknownTilesLeft - len(possibleMineSpace)
-
-			if self.debugPrints: print('remaining mines: ',remainingMines)
-			if self.debugPrints: print('remaining tiles: ',remainingTiles)
-
-			if remainingTiles >= remainingMines and remainingMines >= 0:
-				numPossibilities = nCk(remainingTiles, remainingMines)
-				for tile in config:
-					tileMineCounts[tile] += numPossibilities
-				totalPossibilities += numPossibilities
-
-		tileMineProbabilities = {}
-		for tile in tileMineCounts:
-			if totalPossibilities > 0:  # Ensure don't divide by zero
-				tileMineProbabilities[tile] = tileMineCounts[tile] / totalPossibilities
-			else:
-				tileMineProbabilities[tile] = 0
-		
-		# print('Probabilities that a mine is in each tile: ', tileMineProbabilities)
-
-		if tileMineProbabilities == {}:
-			# if last action in move queue is an unflag we're done
+		if not allMineProbabilities:
 			return
 
-		least_risky_tile = None
-		min_probability = float('inf')
+		least_risky_tile = min(allMineProbabilities, key=allMineProbabilities.get)
+		x, y = least_risky_tile
 
-		for tile, probability in tileMineProbabilities.items():
-			if probability < min_probability:
-				min_probability = probability
-				least_risky_tile = tile
-		
-		x,y = least_risky_tile
-
-		# print(f'Uncovering least risky tile: {least_risky_tile}')
-
-		self.frontierSet.add((x,y))
-		# self.moveQueue.put((x, y, AI.Action.UNCOVER))
-		# prevent duplicates                        
+		self.frontierSet.add((x, y))
 		self.moveSet.add((x, y, AI.Action.UNCOVER))
 
+	def getConnectedComponents(self, possibleMineSpace, max_size=10):
+		def bfs(start, graph, visited):
+			queue = [start]
+			component = set()
+			while queue:
+				node = queue.pop(0)
+				if node not in visited:
+					visited.add(node)
+					component.add(node)
+					queue.extend(graph[node] - visited)
+			return component
+
+		def split_large_component(component, graph, max_size):
+			component_list = list(component)
+			subcomponents = []
+			visited = set()
+
+			def dfs(node, current_component):
+				stack = [node]
+				while stack and len(current_component) < max_size:
+					v = stack.pop()
+					if v not in visited:
+						visited.add(v)
+						current_component.add(v)
+						stack.extend(graph[v] - visited)
+
+			for node in component_list:
+				if node not in visited:
+					current_component = set()
+					dfs(node, current_component)
+					subcomponents.append(current_component)
+
+			return subcomponents
+
+		graph = {tile: set() for tile in possibleMineSpace}
+		for tile in possibleMineSpace:
+			x, y = tile
+			for dx in [-1, 0, 1]:
+				for dy in [-1, 0, 1]:
+					if dx == 0 and dy == 0:
+						continue
+					nx, ny = x + dx, y + dy
+					if (nx, ny) in possibleMineSpace:
+						graph[tile].add((nx, ny))
+
+		visited = set()
+		components = []
+		for tile in graph:
+			if tile not in visited:
+				component = bfs(tile, graph, visited)
+				if len(component) > max_size:
+					components.extend(split_large_component(component, graph, max_size))
+				else:
+					components.append(component)
+
+		return components
 	
 
 	def generateMineConfigs(self, possibleMineSpace, effectiveFrontier):
@@ -424,7 +443,7 @@ class MyAI( AI ):
 						# print('Enqueuing uncover', nx, ny)
 						# self.moveQueue.put((nx, ny, AI.Action.UNCOVER))
 						enqueuedSafeMoves += 1
-						# prevent duplicates                        
+						# prevent duplicates						
 						self.moveSet.add((nx, ny, AI.Action.UNCOVER))
 
 						if (nx, ny, AI.Action.FLAG) in self.moveSet:
