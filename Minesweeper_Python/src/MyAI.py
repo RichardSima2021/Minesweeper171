@@ -165,8 +165,8 @@ class MyAI( AI ):
 
 			# if theres no more moves to make
 			# choose the least risky move
-			# self.chooseLeastRiskyMove()
-			self.chooseLeastRiskyTileset()
+			self.chooseLeastRiskyMove()
+			# self.chooseLeastRiskyTileset()
 
 	def chooseLeastRiskyTileset(self):
 		
