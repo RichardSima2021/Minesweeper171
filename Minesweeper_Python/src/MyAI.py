@@ -206,19 +206,18 @@ class MyAI( AI ):
 					lowestLabel = effectiveEdgeTiles[neighbor]
 			maxMines = min(numTiles, lowestLabel)
 			maxMinesPerTileSet[tileSet] = maxMines
-		
-		for tileSet in sorted(tileSets.items()):
-			print(tileSet)
-		print('-------------------')
-		for tileSetMaxMines in sorted(maxMinesPerTileSet.items()):			
-			print(tileSetMaxMines)
 
 		# each unique set of uncovered neighbors is a tileSet
+
+
 
 		
 		pass
 
-			
+	def generateMineConfigs_TileSet(self, tileSets, maxMinesPerTileSet, effectiveFrontier):
+		pass
+
+
 	
 	def chooseLeastRiskyMove(self):
 
