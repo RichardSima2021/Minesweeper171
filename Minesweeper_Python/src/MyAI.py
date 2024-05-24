@@ -195,7 +195,8 @@ class MyAI( AI ):
 			possibleMineSpace.update(neighbours)
 			neighboursOfTile[(x, y)] = neighbours
 
-		connectedComponents = self.getConnectedComponents(possibleMineSpace, max_size=10)
+		# max size of frontier
+		connectedComponents = self.getConnectedComponents(possibleMineSpace, max_size=15)
 
 		allMineProbabilities = {}
 		for component in connectedComponents:
