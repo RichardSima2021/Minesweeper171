@@ -96,6 +96,7 @@ class World():
 
 			try: 
 				action = self.__ai.getAction(self.__perceptNumber)
+				# print(f'Action: {action}')
 				if self.__checkValidAction(action):
 					if self.__doMove(action):
 						break
@@ -132,6 +133,8 @@ class World():
 		move = actionObj.getMove()
 		X = actionObj.getX()
 		Y = actionObj.getY()
+		
+		# print(f'Attempted {(X,Y)}')
 		if move in [AI.Action.LEAVE, AI.Action.UNCOVER, AI.Action.FLAG, AI.Action.UNFLAG]:
 			if self.__isInBounds(X, Y):
 				return True
@@ -266,6 +269,7 @@ class World():
 			self.__board[c][r].covered = False
 			self.__coveredTiles -= 1
 		self.__perceptNumber = self.__board[c][r].number
+		# print(f"First Move Number: {self.__perceptNumber}")
 
 
 	def __uncoverAll(self) -> None:

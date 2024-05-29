@@ -31,8 +31,7 @@ BIN_DIR = bin
 SOURCES = $(foreach s, $(RAW_SOURCES), $(SOURCE_DIR)/$(s))
 
 all: $(SOURCES)
-	@-eval `'/usr/bin/tclsh' '/pkg/modules/modulecmd.tcl' 'bash' load python/3.5.2` ; \
-	 if hash python3 &> /dev/null ; \
+	@if hash python3 &> /dev/null ; \
 	 then \
 		python3 -m compileall -q src ; \
 	 else \

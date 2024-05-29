@@ -29,16 +29,19 @@ class MyAI( AI ):
 		########################################################################
 		#							YOUR CODE BEGINS						   #
 		########################################################################
-		self.rowDimension = rowDimension
-		self.colDimension = colDimension
+		self.numCols = colDimension
+		self.numRows = rowDimension
+		# print(f'Rows, Cols: {(numCols, numRows)}')
 		self.startX = startX
 		self.startY = startY
+		# print(f'Start X,Y: {(startX, startY)}')
 		self.gameBoard = [[None for _ in range(colDimension)] for _ in range(rowDimension)]
+		# self.debugPrintBoard()
 		self.lastActionCoord = None
 		self.lastActionCoord = self.startX, self.startY
 		# queue of moves based on game board
 		#
-		self.frontierQueue = Queue()
+	
 		self.moveQueue = Queue()
 		self.secondFrontier = Queue()
 
@@ -46,7 +49,7 @@ class MyAI( AI ):
 		self.visitedTiles = set()
 
 		self.uncoveredQueue = Queue()
-		self.frontierSet = {(startX,startY)}
+		self.frontierSet = {(startY,startX)}
 		self.moveSet = set()
 
 		self.debugPrints = False
@@ -71,98 +74,100 @@ class MyAI( AI ):
 
 
 
-	def label(self, x, y):
-		return self.gameBoard[x][y]
+	def label(self, row, col):
+		return self.gameBoard[row][col]
 
-	def numUnMarkedNeighbors(self,x, y):
+	def numUnMarkedNeighbors(self,row, col):
 		result = 0
 		for changeX in [-1, 0, 1]:
 			for changeY in [-1, 0, 1]:
 				if changeX == 0 and changeY == 0:
 					continue
-				indexX, indexY = x + changeX, y + changeY
-				if 0 <= indexX < self.rowDimension and 0 <= indexY < self.colDimension:
-					if self.gameBoard[indexX][indexY] is None:
+				indexRow, indexCol = row + changeY, col + changeX
+				if 0 <= indexRow < self.numRows and 0 <= indexCol < self.numCols:
+					if self.gameBoard[indexRow][indexCol] is None:
 						result += 1
 		return result
 		
-	def numMarkedNeighbors(self,x,y):
+	def numMarkedNeighbors(self,row,col):
 		result = 0
 		for changeX in [-1, 0, 1]:
 			for changeY in [-1, 0, 1]:
 				if changeX == 0 and changeY == 0:
 					continue
-				indexX, indexY = x + changeX, y + changeY
-				if 0 <= indexX < self.rowDimension and 0 <= indexY < self.colDimension:
-					if self.gameBoard[indexX][indexY] == -1:
+				indexRow, indexCol = row + changeY, col + changeX
+				if 0 <= indexRow < self.numRows and 0 <= indexCol < self.numCols:
+					if self.gameBoard[indexRow][indexCol] == -1:
 						result += 1
 		return result
 		
-	def effectiveLabel(self, x, y):
-		if self.gameBoard[x][y] is None:
+	def effectiveLabel(self, row, col):
+		if self.gameBoard[row][col] is None:
 			return -1
-		return self.label(x, y) - self.numMarkedNeighbors(x, y)
+		return self.label(row, col) - self.numMarkedNeighbors(row, col)
 
-	def enqueueAllUnexploredNeighbors(self, x, y):
+	def enqueueAllUnexploredNeighbors(self, row, col):
 		temp_queue = []
 		for changeX in [-1, 0, 1]:
 			for changeY in [-1, 0, 1]:
 				if changeX == 0 and changeY == 0:
 					continue  # Skip the current tile itself
-				indexX, indexY = x + changeX, y + changeY
-				if 0 <= indexX < self.rowDimension and 0 <= indexY < self.colDimension:
+				indexRow, indexCol = row + changeY, col + changeX
+				if 0 <= indexRow < self.numRows and 0 <= indexCol < self.numCols:
 					# if self.gameBoard[indexX][indexY] is not None and (indexX,indexY) not in self.visitedTiles:  # Check if the tile is unexplored
-					if self.gameBoard[indexX][indexY] is None: 
+					if self.gameBoard[indexRow][indexCol] is None: 
 						# Create a unique identifier for the coordinate
-						coord = indexX, indexY
+						coord = indexRow, indexCol
 						# print(f'Add {coord} to frontier')
 						if coord not in self.enqueuedInFrontier:
 							# prevents duplicates
 							temp_queue.append(coord)
 		# Enqueue all unique and valid neighbors found
 		for coord in temp_queue:
-			# self.frontierQueue.put(coord)
 			self.frontierSet.add(coord)
 			# prevents duplicates
 			self.enqueuedInFrontier.add(coord)
 			
 	def solve(self):
-		# print(list(self.frontierQueue.queue))
 		recheckQueue = Queue()
 		
 		solvedWithRuleOfThumb = False
 
 		if self.getTotalMinesLeft() == 0:
+			# print("No more mines left")
 			# if no mines left uncover all tiles
 			for row in range(len(self.gameBoard)):
 				for col in range(len(self.gameBoard[row])):
 					if self.gameBoard[row][col] is None:
 						# self.moveQueue.put((row, col, AI.Action.UNCOVER))
-						# prevent duplicates						
-						self.moveSet.add((row, col, AI.Action.UNCOVER))
+						# prevent duplicates
+						self.moveSet.add((col, row, AI.Action.UNCOVER))
 						# prevent frontierSet key not found bug
 						self.frontierSet.add((row,col))
+			# print(f"Remaining Frontier: {self.frontierSet}")
 
 		# if rule of thumb can't be applied now, check it again later		
 		while not self.uncoveredQueue.empty():
-			x, y = self.uncoveredQueue.get()
-			# print(f'Try to apply rule of thumb to {x,y}')
-			effective_label = self.effectiveLabel(x, y)
-			num_unmarked_neighbors = self.numUnMarkedNeighbors(x, y)
-			if effective_label == num_unmarked_neighbors:
+			row, col = self.uncoveredQueue.get()
+			# print(f'Try to apply rule of thumb to {col,row}')
+			effective_label = self.effectiveLabel(row, col)
+			# print(f"Effective label of {col, row} is {effective_label}")
+			num_unmarked_neighbors = self.numUnMarkedNeighbors(row, col)
+			# print(f"Num unmarked neighbors of {col, row} is {num_unmarked_neighbors}")
+			if effective_label == num_unmarked_neighbors and effective_label > 0:
 				# All unmarked neighbors are mines
-				numMarkedNeighbors = self.markAllNeighborsAsMines(x, y)
-				# print(f'All neighbors rule applied to {x,y}')
+				numMarkedNeighbors = self.markAllNeighborsAsMines(row, col)
+				# print(f'All neighbors rule applied to {col,row}')
 				solvedWithRuleOfThumb = (numMarkedNeighbors > 0)
 			elif effective_label == 0:			   
-				numEnqueuedSafe = self.enqueueSafeMoves(x, y)
-				# print(f'Effective Label 0 rule applied to {x,y}')
+				numEnqueuedSafe = self.enqueueSafeMoves(row, col)
+				# print(f'Effective Label 0 rule applied to {col,row}')
 				solvedWithRuleOfThumb = (numEnqueuedSafe > 0)
 			else:
 				if effective_label > 0:
 					# if the tile has been uncovered before
 					# print(f'{x,y} could not have rule of thumb applied, re check later')				
-					recheckQueue.put((x,y))
+					recheckQueue.put((row,col))
 		self.uncoveredQueue = recheckQueue
 
 		if not solvedWithRuleOfThumb:
@@ -182,7 +187,7 @@ class MyAI( AI ):
 			f = math.factorial
 			return f(n) // (f(k) * f(n - k))
 
-		print('Use probability')
+		# print('Use probability')
 
 		effectiveEdgeTiles = {tile: self.effectiveLabel(tile[0], tile[1]) for tile in self.uncoveredQueue.queue}
 
@@ -190,13 +195,14 @@ class MyAI( AI ):
 		neighboursOfTile = {}
 
 		for tile in effectiveEdgeTiles.keys():
-			x, y = tile
-			neighbours = self.getUnflaggedNeighbours(x, y)
+			row, col = tile
+			neighbours = self.getUnflaggedNeighbours(row, col)
 			possibleMineSpace.update(neighbours)
-			neighboursOfTile[(x, y)] = neighbours
+			# possibleMineSpace stores {(row,col), (row,col)}
+			neighboursOfTile[(row, col)] = neighbours
 
 		# max size of frontier
-		connectedComponents = self.getConnectedComponents(possibleMineSpace, max_size=15)
+		connectedComponents = self.getConnectedComponents(possibleMineSpace, max_size=10)
 
 		allMineProbabilities = {}
 		for component in connectedComponents:
@@ -226,10 +232,10 @@ class MyAI( AI ):
 			return
 
 		least_risky_tile = min(allMineProbabilities, key=allMineProbabilities.get)
-		x, y = least_risky_tile
+		row, col = least_risky_tile
 
-		self.frontierSet.add((x, y))
-		self.moveSet.add((x, y, AI.Action.UNCOVER))
+		self.frontierSet.add((row, col))
+		self.moveSet.add((col, row, AI.Action.UNCOVER))
 
 	def getConnectedComponents(self, possibleMineSpace, max_size=10):
 		def bfs(start, graph, visited):
@@ -267,14 +273,14 @@ class MyAI( AI ):
 
 		graph = {tile: set() for tile in possibleMineSpace}
 		for tile in possibleMineSpace:
-			x, y = tile
+			row, col = tile
 			for dx in [-1, 0, 1]:
 				for dy in [-1, 0, 1]:
 					if dx == 0 and dy == 0:
 						continue
-					nx, ny = x + dx, y + dy
-					if (nx, ny) in possibleMineSpace:
-						graph[tile].add((nx, ny))
+					indexRow, indexCol = row + dy, col + dx
+					if (indexRow, indexCol) in possibleMineSpace:
+						graph[tile].add((indexRow, indexCol))
 
 		visited = set()
 		components = []
@@ -319,13 +325,10 @@ class MyAI( AI ):
 		def placementValid(config):
 			dupEffecetiveFrontier = effectiveFrontier.copy()	
 
-			# if len(config) > self.getTotalMinesLeft():
-			# 	return False
-
 			for mine in config:
 			# for every mine
-				x, y = mine
-				for tile in self.getUncoveredNeighbours(x,y):
+				row, col = mine
+				for tile in self.getUncoveredNeighbours(row,col):
 					# find its neighbours in the effectiveFrontier and reduce by one
 					if tile in dupEffecetiveFrontier:
 						dupEffecetiveFrontier[tile] -= 1
@@ -339,17 +342,12 @@ class MyAI( AI ):
 			dupEffecetiveFrontier = effectiveFrontier.copy()	
 			for mine in config:
 			# for every mine
-				x, y = mine
-				for tile in self.getUncoveredNeighbours(x,y):
+				row, col = mine
+				for tile in self.getUncoveredNeighbours(row,col):
 					# find its neighbours in the effectiveFrontier and reduce by one
 					if tile in dupEffecetiveFrontier:
 						dupEffecetiveFrontier[tile] -= 1
 
-
-			# for tile in dupEffecetiveFrontier.keys():
-			# 	# everything in frontier should have effective 0 now
-			# 	if dupEffecetiveFrontier[tile] != 0:
-			# 		return False
 			return True
 
 
@@ -364,125 +362,116 @@ class MyAI( AI ):
 		
 	def getTotalMinesLeft(self):
 		totalMinesFlagged = 0
-		for x in self.gameBoard:
-			for y in x:
-				if y == -1:
+		for row in self.gameBoard:
+			for tile in row:
+				if tile == -1:
 					totalMinesFlagged += 1
 
 		totalMinesLeft = self.totalMines - totalMinesFlagged
 		return totalMinesLeft
 
 
-	def getUnflaggedNeighbours(self, x, y):
+	def getUnflaggedNeighbours(self, row, col):
 		unflaggedNeighbours = set()
 		for dx in [-1,0,1]:
 			for dy in [-1,0,1]:
 				if dx == 0 and dy == 0:
 					continue
 				else:
-					nx, ny = x + dx, y + dy
-					if 0 <= nx < self.rowDimension and 0 <= ny < self.colDimension:
+					indexRow, indexCol = row + dy, col + dx
+					if 0 <= indexRow < self.numRows and 0 <= indexCol < self.numCols:
 						# print((nx, ny), 'is a valid neighbour of', (x,y))
-						if self.gameBoard[nx][ny] is None:
-							unflaggedNeighbours.add((nx,ny))
+						if self.gameBoard[indexRow][indexCol] is None:
+							unflaggedNeighbours.add((indexRow,indexCol))
 		return unflaggedNeighbours
 			
-	def getUncoveredNeighbours(self, x, y):
-		unflaggedNeighbours = set()
+	def getUncoveredNeighbours(self, row, col):
+		uncoveredNeighbours = set()
 		for dx in [-1,0,1]:
 			for dy in [-1,0,1]:
 				if dx == 0 and dy == 0:
 					continue
 				else:
-					nx, ny = x + dx, y + dy
-					if 0 <= nx < self.rowDimension and 0 <= ny < self.colDimension:
+					indexRow, indexCol = row + dy, col + dy
+					if 0 <= indexRow < self.numRows and 0 <= indexCol < self.numCols:
 						# print((nx, ny), 'is a valid neighbour of', (x,y))
-						if self.gameBoard[nx][ny] is not None and self.gameBoard[nx][ny] >= 0:
-							unflaggedNeighbours.add((nx,ny))
-		return unflaggedNeighbours
+						if self.gameBoard[indexRow][indexCol] is not None and self.gameBoard[indexRow][indexCol] >= 0:
+							uncoveredNeighbours.add((row,col))
+		return uncoveredNeighbours
 			
 
 
-	def markAllNeighborsAsMines(self, x, y):
+	def markAllNeighborsAsMines(self, row, col):
 		numMarkedNeighbors = 0
 		# we use this to keep track of whether this rule of thumb did anything, if not we don't count it as solved with rule of thumb
 		for dx in [-1, 0, 1]:
 			for dy in [-1, 0, 1]:
 				if dx == 0 and dy == 0:
 					continue
-				nx, ny = x + dx, y + dy
-				if 0 <= nx < self.rowDimension and 0 <= ny < self.colDimension:
+				indexRow, indexCol = row + dy, col + dx
+				if 0 <= indexRow < self.numRows and 0 <= indexCol < self.numCols:
 					# print("?")					
-					if self.gameBoard[nx][ny] is None and (nx, ny, AI.Action.FLAG) not in self.moveSet:
+					if self.gameBoard[indexRow][indexCol] is None and (indexCol, indexRow, AI.Action.FLAG) not in self.moveSet:
 						# self.moveQueue.put((nx, ny, AI.Action.FLAG))
-						self.moveSet.add((nx, ny, AI.Action.FLAG))
+						self.moveSet.add((indexCol, indexRow, AI.Action.FLAG))
 						numMarkedNeighbors += 1
 
-						if (nx, ny, AI.Action.UNCOVER) in self.moveSet:
-							self.moveSet.remove((nx, ny, AI.Action.UNCOVER))
-						# for move in self.moveQueue.queue:
-						# 	if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.FLAG:
-						# 		# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
-						# 		# if we can confirm with 100% certainty that move is wrong, we should remove it
-						# 		self.moveQueue.queue.remove(move)
-						# 		self.moveSet.remove(move)
-						# 		break
+						if (indexCol, indexRow, AI.Action.UNCOVER) in self.moveSet:
+							self.moveSet.remove((indexCol, indexRow, AI.Action.UNCOVER))
 		return numMarkedNeighbors
 
 
 
-	def enqueueSafeMoves(self, x, y):
+	def enqueueSafeMoves(self, row, col):
 		enqueuedSafeMoves = 0
 		# we use this to keep track of whether this rule of thumb did anything, if not we don't count it as solved with rule of thumb
 		for dx in [-1, 0, 1]:
 			for dy in [-1, 0, 1]:
 				if dx == 0 and dy == 0:
 					continue
-				nx, ny = x + dx, y + dy
-				if 0 <= nx < self.rowDimension and 0 <= ny < self.colDimension:
-					if self.gameBoard[nx][ny] is None and (nx, ny, AI.Action.UNCOVER) not in self.moveSet: 
-						# print('Enqueuing uncover', nx, ny)
+				indexRow, indexCol = row + dy, col + dx
+				if 0 <= indexRow < self.numRows and 0 <= indexCol < self.numCols:
+					if self.gameBoard[indexRow][indexCol] is None and (indexCol, indexRow, AI.Action.UNCOVER) not in self.moveSet: 
+						# print('Enqueuing uncover', col, row)
 						# self.moveQueue.put((nx, ny, AI.Action.UNCOVER))
 						enqueuedSafeMoves += 1
 						# prevent duplicates						
-						self.moveSet.add((nx, ny, AI.Action.UNCOVER))
+						self.moveSet.add((indexCol, indexRow, AI.Action.UNCOVER))
 
-						if (nx, ny, AI.Action.FLAG) in self.moveSet:
-							self.moveSet.remove((nx, ny, AI.Action.FLAG))
-
-						# for move in self.moveQueue.queue:
-						# 	if (move[0], move[1]) == (nx, ny) and move[2] != AI.Action.UNCOVER:
-						# 		# sometimes the probability gets invoked when it isn't supposed to and adds a wrong move
-						# 		# if we can confirm with 100% certainty that move is wrong, we should remove it
-						# 		self.moveQueue.queue.remove(move)
-						# 		self.moveSet.remove(move)
-						# 		break
+						if (indexCol, indexRow, AI.Action.FLAG) in self.moveSet:
+							self.moveSet.remove((indexCol, indexRow, AI.Action.FLAG))
 		
 		return enqueuedSafeMoves
 						
 
 
 	def getAction(self, number: int) -> "Action Object":
+		# print(f"Last uncovered was: {number}")
 		########################################################################
 		#							YOUR CODE BEGINS						   #
 		# execute the next move in the move queue
-		# print('debug')
+
 		# return Action(AI.Action.UNCOVER, 0, 0)
 		########################################################################
 		# check the number returned, update gameBoard accordingly, if it is -1, check if existing is None(unflagged) or -1(flagged), update accordingly
 		if number != -1:
-			self.gameBoard[self.lastActionCoord[0]][self.lastActionCoord[1]] = number
+			# print(f'Setting {self.lastActionCoord[0]},{self.lastActionCoord[1]} to {number}')
+			self.gameBoard[self.lastActionCoord[1]][self.lastActionCoord[0]] = number
+			# print("debug")
 		else:
-			if self.gameBoard[self.lastActionCoord[0]][self.lastActionCoord[1]] == -1:
-				self.gameBoard[self.lastActionCoord[0]][self.lastActionCoord[1]] = None
+			if self.gameBoard[self.lastActionCoord[1]][self.lastActionCoord[0]] == -1:
+				self.gameBoard[self.lastActionCoord[1]][self.lastActionCoord[0]] = None
 			else:
-				self.gameBoard[self.lastActionCoord[0]][self.lastActionCoord[1]] = -1
+				self.gameBoard[self.lastActionCoord[1]][self.lastActionCoord[0]] = -1
 
-		self.uncoveredQueue.put((self.lastActionCoord[0], self.lastActionCoord[1]))
-		self.frontierSet.remove((self.lastActionCoord[0], self.lastActionCoord[1]))
-		# self.frontierQueue.put((self.lastActionCoord[0], self.lastActionCoord[1]))
-		self.visitedTiles.add((self.lastActionCoord[0], self.lastActionCoord[1]))
-		self.enqueueAllUnexploredNeighbors(self.lastActionCoord[0], self.lastActionCoord[1])
+
+		
+
+		self.uncoveredQueue.put((self.lastActionCoord[1], self.lastActionCoord[0]))
+		self.frontierSet.remove((self.lastActionCoord[1], self.lastActionCoord[0]))
+
+		self.visitedTiles.add((self.lastActionCoord[1], self.lastActionCoord[0]))
+		self.enqueueAllUnexploredNeighbors(self.lastActionCoord[1], self.lastActionCoord[0])
 
 		# print(f'Uncovered Frontier: {sorted(list(self.uncoveredQueue.queue))}')
 		# print(f'Covered Frontier: {sorted(list(self.frontierSet))}')
@@ -494,17 +483,18 @@ class MyAI( AI ):
 		# for move in self.moveSet:
 		# 	print(move)
 
-		# self.debugPrintBoard()
+		self.debugPrintBoard()
+
 		
 		# while not self.moveQueue.empty():
 		while len(self.moveSet) > 0:
 			# nx, ny, action = self.moveQueue.get()
-			nx, ny, action = self.moveSet.pop()
-			if self.gameBoard[nx][ny] != None:
+			indexCol, indexRow, action = self.moveSet.pop()
+			if self.gameBoard[indexRow][indexCol] != None:
 				continue
-			self.lastActionCoord = nx, ny
+			self.lastActionCoord = indexCol, indexRow
 			self.unknownTilesLeft -= 1
-			return Action(action, nx, ny)
+			return Action(action, indexCol, indexRow)
 		# default action
 		return Action(AI.Action.LEAVE)	
 	
