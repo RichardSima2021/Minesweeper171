@@ -201,13 +201,16 @@ class MyAI( AI ):
 			# possibleMineSpace stores {(row,col), (row,col)}
 			neighboursOfTile[(row, col)] = neighbours
 
+		
 		# max size of frontier
-		connectedComponents = self.getConnectedComponents(possibleMineSpace, max_size=10)
+		connectedComponents = self.getConnectedComponents(possibleMineSpace, max_size=15)
 
 		allMineProbabilities = {}
-		for component in connectedComponents:
+		for component in sorted(connectedComponents, key=lambda x:len(x)):
 			componentList = list(component)
+			print("component list:", componentList)
 			componentMineConfigs = self.generateMineConfigs(componentList, effectiveEdgeTiles)
+			# print("Mine configs for this component:", componentMineConfigs)
 			tileMineCounts = {tile: 0 for tile in componentList}
 			totalPossibilities = 0
 			totalMinesLeft = self.getTotalMinesLeft()
@@ -230,14 +233,20 @@ class MyAI( AI ):
 
 		if not allMineProbabilities:
 			return
+		
+
+		for mine, probability in sorted(allMineProbabilities.items(), key=lambda item: item[1]):
+			print(mine, probability)
+		
 
 		least_risky_tile = min(allMineProbabilities, key=allMineProbabilities.get)
 		row, col = least_risky_tile
 
 		self.frontierSet.add((row, col))
 		self.moveSet.add((col, row, AI.Action.UNCOVER))
+	
 
-	def getConnectedComponents(self, possibleMineSpace, max_size=10):
+	def getConnectedComponents(self, possibleMineSpace, max_size=15):
 		def bfs(start, graph, visited):
 			queue = [start]
 			component = set()
@@ -298,6 +307,7 @@ class MyAI( AI ):
 	def generateMineConfigs(self, possibleMineSpace, effectiveFrontier):
 		def recursivelyGenerateMineConfig(possibleMineSpace, currentConfig, allConfigs, index):
 			if index == len(possibleMineSpace):
+				# print(f"Test {currentConfig}")
 				# base case no more possible mine spaces
 				if fullConfigValid(currentConfig):
 					allConfigs.append(currentConfig.copy())
@@ -325,6 +335,9 @@ class MyAI( AI ):
 		def placementValid(config):
 			dupEffecetiveFrontier = effectiveFrontier.copy()	
 
+			if len(config) > self.getTotalMinesLeft():
+				return False
+
 			for mine in config:
 			# for every mine
 				row, col = mine
@@ -334,7 +347,6 @@ class MyAI( AI ):
 						dupEffecetiveFrontier[tile] -= 1
 						if dupEffecetiveFrontier[tile] < 0:
 							return False
-			# print(config, 'is a valid partial mine config')
 			return True
 		
 
@@ -343,10 +355,17 @@ class MyAI( AI ):
 			for mine in config:
 			# for every mine
 				row, col = mine
+				neighborsOfMine = self.getUncoveredNeighbours(row,col)
 				for tile in self.getUncoveredNeighbours(row,col):
 					# find its neighbours in the effectiveFrontier and reduce by one
-					if tile in dupEffecetiveFrontier:
+					if tile in dupEffecetiveFrontier.keys():
 						dupEffecetiveFrontier[tile] -= 1
+			
+			# if self.unknownTilesLeft == len(possibleMineSpace):
+			for tile in dupEffecetiveFrontier.keys():
+				if dupEffecetiveFrontier[tile] != 0:						
+					return False
+			
 
 			return True
 
@@ -354,6 +373,7 @@ class MyAI( AI ):
 
 		allConfigs = []
 		currentConfig = []
+		# print(f"Effective frontier: {effectiveFrontier}")
 
 		recursivelyGenerateMineConfig(possibleMineSpace, currentConfig, allConfigs, 0)
 
@@ -392,11 +412,12 @@ class MyAI( AI ):
 				if dx == 0 and dy == 0:
 					continue
 				else:
-					indexRow, indexCol = row + dy, col + dy
-					if 0 <= indexRow < self.numRows and 0 <= indexCol < self.numCols:
-						# print((nx, ny), 'is a valid neighbour of', (x,y))
+					indexRow, indexCol = row + dy, col + dx
+					if 0 <= indexRow < self.numRows and 0 <= indexCol < self.numCols:					
 						if self.gameBoard[indexRow][indexCol] is not None and self.gameBoard[indexRow][indexCol] >= 0:
-							uncoveredNeighbours.add((row,col))
+							
+							uncoveredNeighbours.add((indexRow,indexCol))
+		
 		return uncoveredNeighbours
 			
 
@@ -432,8 +453,6 @@ class MyAI( AI ):
 				indexRow, indexCol = row + dy, col + dx
 				if 0 <= indexRow < self.numRows and 0 <= indexCol < self.numCols:
 					if self.gameBoard[indexRow][indexCol] is None and (indexCol, indexRow, AI.Action.UNCOVER) not in self.moveSet: 
-						# print('Enqueuing uncover', col, row)
-						# self.moveQueue.put((nx, ny, AI.Action.UNCOVER))
 						enqueuedSafeMoves += 1
 						# prevent duplicates						
 						self.moveSet.add((indexCol, indexRow, AI.Action.UNCOVER))
@@ -446,18 +465,9 @@ class MyAI( AI ):
 
 
 	def getAction(self, number: int) -> "Action Object":
-		# print(f"Last uncovered was: {number}")
-		########################################################################
-		#							YOUR CODE BEGINS						   #
-		# execute the next move in the move queue
-
-		# return Action(AI.Action.UNCOVER, 0, 0)
-		########################################################################
 		# check the number returned, update gameBoard accordingly, if it is -1, check if existing is None(unflagged) or -1(flagged), update accordingly
-		if number != -1:
-			# print(f'Setting {self.lastActionCoord[0]},{self.lastActionCoord[1]} to {number}')
-			self.gameBoard[self.lastActionCoord[1]][self.lastActionCoord[0]] = number
-			# print("debug")
+		if number != -1:			
+			self.gameBoard[self.lastActionCoord[1]][self.lastActionCoord[0]] = number			
 		else:
 			if self.gameBoard[self.lastActionCoord[1]][self.lastActionCoord[0]] == -1:
 				self.gameBoard[self.lastActionCoord[1]][self.lastActionCoord[0]] = None
@@ -478,12 +488,11 @@ class MyAI( AI ):
 
 		self.solve()
 
-		# print(f'After going through uncovered and ruling out all moves solvable with rule of thumb: {list(self.uncoveredQueue.queue)}')
+		
 		# print(f'Safe moves:')
 		# for move in self.moveSet:
 		# 	print(move)
 
-		self.debugPrintBoard()
 
 		
 		# while not self.moveQueue.empty():
