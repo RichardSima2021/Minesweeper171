@@ -189,6 +189,8 @@ class MyAI( AI ):
 
 		# print('Use probability')
 
+		uncoveredSet = set(self.uncoveredQueue.queue)
+
 		effectiveEdgeTiles = {tile: self.effectiveLabel(tile[0], tile[1]) for tile in self.uncoveredQueue.queue}
 
 		possibleMineSpace = set()
@@ -203,13 +205,23 @@ class MyAI( AI ):
 
 		
 		# max size of frontier
-		connectedComponents = self.getConnectedComponents(possibleMineSpace, max_size=15)
+		connectedComponents = self.getConnectedComponents(possibleMineSpace, max_size=21)
 
 		allMineProbabilities = {}
 		for component in sorted(connectedComponents, key=lambda x:len(x)):
 			componentList = list(component)
-			print("component list:", componentList)
-			componentMineConfigs = self.generateMineConfigs(componentList, effectiveEdgeTiles)
+			# print("component list:", componentList)
+
+			# find effectiveEdgeTiles of current component
+			componentEffectiveEdges = dict()
+			for space in component:
+				row, col = space
+				for neighbor in self.getUncoveredNeighbours(row, col):
+					n_row, n_col = neighbor
+					componentEffectiveEdges[(n_row, n_col)] = self.effectiveLabel(n_row, n_col)
+
+
+			componentMineConfigs = self.generateMineConfigs(componentList, componentEffectiveEdges)
 			# print("Mine configs for this component:", componentMineConfigs)
 			tileMineCounts = {tile: 0 for tile in componentList}
 			totalPossibilities = 0
@@ -235,8 +247,8 @@ class MyAI( AI ):
 			return
 		
 
-		for mine, probability in sorted(allMineProbabilities.items(), key=lambda item: item[1]):
-			print(mine, probability)
+		# for mine, probability in sorted(allMineProbabilities.items(), key=lambda item: item[1]):
+		# 	print(mine, probability)
 		
 
 		least_risky_tile = min(allMineProbabilities, key=allMineProbabilities.get)
@@ -355,7 +367,6 @@ class MyAI( AI ):
 			for mine in config:
 			# for every mine
 				row, col = mine
-				neighborsOfMine = self.getUncoveredNeighbours(row,col)
 				for tile in self.getUncoveredNeighbours(row,col):
 					# find its neighbours in the effectiveFrontier and reduce by one
 					if tile in dupEffecetiveFrontier.keys():
@@ -363,7 +374,8 @@ class MyAI( AI ):
 			
 			# if self.unknownTilesLeft == len(possibleMineSpace):
 			for tile in dupEffecetiveFrontier.keys():
-				if dupEffecetiveFrontier[tile] != 0:						
+				if dupEffecetiveFrontier[tile] != 0:	
+					# print(f'config failed due to not satisfying tile {tile} with now effective label {dupEffecetiveFrontier[tile]}\n config: {config}')					
 					return False
 			
 
