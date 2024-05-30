@@ -48,7 +48,7 @@ from World import World
 from ManualAI import ManualAI
 from RandomAI import RandomAI
 from MyAI import MyAI
-
+from datetime import datetime
 
 def main():
 
@@ -103,6 +103,8 @@ def main():
 			scoreBeg = 0
 			scoreInt = 0
 			scoreExp = 0
+			print(f'Start: {datetime.now()}')
+			startTime = datetime.now()
 			for dirpath, _, filenames in directory:
 				for filename in filenames:
 					f = os.path.join(dirpath, filename)
@@ -127,7 +129,9 @@ def main():
 			print("---------------Your agent's results:---------------")
 			print("Beginner: {} \tIntermediate: {} \tExpert: {}".format(scoreBeg, scoreInt, scoreExp))
 			print("Cumulative Score: " + str(sumScores))
-
+			endTime = datetime.now()
+			print(f'Stop: {endTime}')
+			print(f'Total time: {endTime-startTime}')
 			if outputFile:
 				currDirectory = os.path.dirname(__file__)
 				outputFilePath = os.path.join(currDirectory, outputFile)

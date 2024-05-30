@@ -205,7 +205,7 @@ class MyAI( AI ):
 
 		
 		# max size of frontier
-		connectedComponents = self.getConnectedComponents(possibleMineSpace, max_size=21)
+		connectedComponents = self.getConnectedComponents(possibleMineSpace, max_size=22)
 
 		allMineProbabilities = {}
 		for component in sorted(connectedComponents, key=lambda x:len(x)):
